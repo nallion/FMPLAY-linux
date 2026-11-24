@@ -103,6 +103,9 @@ static int playing_station = -1;
 static int playing = 0;
 static int use_colors = 0;
 static int layout_ok = 0;
+static int volume = 30;
+static int last_drawn_volume = -1;
+
 
 static time_t next_restart = 0;
 static time_t playback_started = 0;
@@ -111,6 +114,7 @@ static time_t playback_elapsed = 0;
 static time_t last_progress_time = 0;
 static time_t last_ipc_check = 0;
 static time_t last_timer_value = -1;
+static time_t last_clock_value = (time_t)-1;
 
 static double last_time_pos = -1.0;
 
@@ -213,6 +217,9 @@ static int start_player(int index)
         }
 
         char timeout_arg[] = "--network-timeout=5";
+        char volume_arg[32];
+
+        snprintf(volume_arg, sizeof(volume_arg), "--volume=%d", volume);
 
         char ipc_arg[140];
 
@@ -230,6 +237,7 @@ static int start_player(int index)
                 "mpv",
                 "--cache-secs=10",
                 "--no-terminal",
+                volume_arg,
                 "-ao", "alsa",
                 timeout_arg,
                 ipc_arg,
@@ -245,6 +253,7 @@ static int start_player(int index)
                 "mpv",
                 "mpv",
                 "--no-terminal",
+                volume_arg,
                 "-ao", "alsa",
                 timeout_arg,
                 ipc_arg,
@@ -394,6 +403,62 @@ static int get_mpv_time_pos(double *position)
     return 1;
 }
 
+
+/* Set MPV volume through its IPC socket. */
+static int set_mpv_volume(int value)
+{
+    int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+
+    if (fd < 0)
+        return 0;
+
+    struct sockaddr_un addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sun_family = AF_UNIX;
+
+    snprintf(addr.sun_path, sizeof(addr.sun_path), "%s", ipc_socket_path);
+
+    if (connect(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+        close(fd);
+        return 0;
+    }
+
+    char request[128];
+    int length = snprintf(
+        request,
+        sizeof(request),
+        "{\"command\":[\"set_property\",\"volume\",%d]}\n",
+        value
+    );
+
+    if (length <= 0 || (size_t)length >= sizeof(request)) {
+        close(fd);
+        return 0;
+    }
+
+    size_t total_sent = 0;
+    while (total_sent < (size_t)length) {
+        ssize_t sent = write(
+            fd,
+            request + total_sent,
+            (size_t)length - total_sent
+        );
+
+        if (sent < 0 && errno == EINTR)
+            continue;
+
+        if (sent <= 0) {
+            close(fd);
+            return 0;
+        }
+
+        total_sent += (size_t)sent;
+    }
+
+    close(fd);
+    return 1;
+}
+
 /* Monitor actual playback progress */
 
 static int check_stream_progress(void)
@@ -507,12 +572,12 @@ static void draw_static(void)
 
     mvprintw(
         height - 3, 4,
-        "ВВЕРХ/ВНИЗ: Выбор станции    ENTER: Играть"
+        "ВВЕРХ/ВНИЗ: Станция    ENTER: Играть"
     );
 
     mvprintw(
         height - 2, 4,
-        "S: Стоп            Q / ESC: Выход"
+        "LEFT/RIGHT: Громкость    S: Стоп    Q / ESC: Выход"
     );
 
     layout_ok = 1;
@@ -536,12 +601,12 @@ static void add_utf8_padded(int y, int x, const char *text, int columns)
         for (int i = 0; i < columns && i < 255; i++)
             output[i] = L'?';
         int n = columns < 255 ? columns : 255;
-        output[n] = L'\\0';
+        output[n] = L'\0';
         mvaddnwstr(y, x, output, n);
         return;
     }
 
-    input[count] = L'\\0';
+    input[count] = L'\0';
 
     int used_columns = 0;
     int out_count = 0;
@@ -569,7 +634,7 @@ static void add_utf8_padded(int y, int x, const char *text, int columns)
         used_columns++;
     }
 
-    output[out_count] = L'\\0';
+    output[out_count] = L'\0';
     mvaddnwstr(y, x, output, out_count);
 }
 
@@ -581,7 +646,8 @@ static void update_station_row(int index)
         index >= (int)STATION_COUNT)
         return;
 
-    int y = 8 + index * 2;
+    /* Compact station list: one terminal row per station. */
+    int y = 8 + index;
 
     if (index == selected_station)
         attron(A_REVERSE | A_BOLD);
@@ -691,6 +757,86 @@ static void update_timer(void)
     doupdate();
 }
 
+/* Draw the volume bar near the bottom of the interface. */
+static void update_volume_bar(void)
+{
+    if (!layout_ok || volume == last_drawn_volume)
+        return;
+
+    int height, width;
+    getmaxyx(stdscr, height, width);
+    (void)width;
+
+    const int y = height - 4;
+    const int bar_x = 18;
+    const int bar_width = 28;
+    int filled = (volume * bar_width + 50) / 100;
+
+    move(y, 4);
+    clrtoeol();
+    mvaddstr(y, 4, "Громкость:");
+
+    for (int i = 0; i < bar_width; i++) {
+        if (i < filled) {
+            if (use_colors)
+                attron(COLOR_PAIR(3) | A_BOLD);
+            else
+                attron(A_BOLD);
+            mvaddch(y, bar_x + i, '#');
+            attroff(A_BOLD);
+            if (use_colors)
+                attroff(COLOR_PAIR(3));
+        } else {
+            mvaddch(y, bar_x + i, '-');
+        }
+    }
+
+    mvprintw(y, bar_x + bar_width + 2, "%3d%%", volume);
+    last_drawn_volume = volume;
+
+    wnoutrefresh(stdscr);
+    doupdate();
+}
+
+/* Update current local time in the upper-right corner */
+static void update_clock(void)
+{
+    if (!layout_ok)
+        return;
+
+    time_t now = time(NULL);
+
+    if (now == last_clock_value)
+        return;
+
+    last_clock_value = now;
+
+    struct tm local_time;
+    char clock_text[16];
+
+    if (localtime_r(&now, &local_time) == NULL ||
+        strftime(clock_text, sizeof(clock_text),
+                 "%H:%M:%S", &local_time) == 0) {
+        return;
+    }
+
+    int height, width;
+    getmaxyx(stdscr, height, width);
+    (void)height;
+
+    int x = width - (int)strlen(clock_text) - 3;
+
+    if (x < 0)
+        return;
+
+    attron(A_BOLD);
+    mvaddstr(2, x, clock_text);
+    attroff(A_BOLD);
+
+    wnoutrefresh(stdscr);
+    doupdate();
+}
+
 /* Update bottom status */
 
 static void update_footer(void)
@@ -723,6 +869,7 @@ static void update_footer(void)
 static void draw_interface(void)
 {
     last_timer_value = -1;
+    last_drawn_volume = -1;
 
     draw_static();
 
@@ -731,6 +878,8 @@ static void draw_interface(void)
 
     update_station_list();
     update_timer();
+    update_volume_bar();
+    update_clock();
     update_footer();
 
     wnoutrefresh(stdscr);
@@ -743,6 +892,7 @@ int main(void)
 {
     signal(SIGINT, handle_signal);
     signal(SIGTERM, handle_signal);
+    signal(SIGPIPE, SIG_IGN);
 
     snprintf(
         ipc_socket_path,
@@ -909,6 +1059,31 @@ int main(void)
                 break;
             }
 
+            case KEY_LEFT:
+            case KEY_RIGHT:
+            {
+                int old_volume = volume;
+
+                if (ch == KEY_LEFT)
+                    volume -= 5;
+                else
+                    volume += 5;
+
+                if (volume < 0)
+                    volume = 0;
+                if (volume > 100)
+                    volume = 100;
+
+                if (volume != old_volume) {
+                    if (player_pid > 0)
+                        set_mpv_volume(volume);
+
+                    update_volume_bar();
+                }
+
+                break;
+            }
+
             case '\n':
             case KEY_ENTER:
             {
@@ -995,9 +1170,11 @@ int main(void)
                 break;
         }
 
-        /* Update timer */
+        /* Update playback timer and wall clock */
 
         update_timer();
+        update_volume_bar();
+        update_clock();
     }
 
     stop_player();
