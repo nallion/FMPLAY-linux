@@ -14,7 +14,7 @@ Plays stations with 24kbps/s aac-he-v2 bitrate.
 - mpv
 - ALSA
 
-## Compilation
+## Compilation (Debian / Ubuntu)
 
 ```bash
 sudo apt install wget build-essential libncurses-dev mpv
