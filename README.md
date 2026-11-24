@@ -17,7 +17,8 @@ Plays stations with 24kbps/s aac-he-v2 bitrate.
 ## Compilation
 
 ```bash
-sudo apt install build-essential libncurses-dev mpv
+sudo apt install wget build-essential libncurses-dev mpv
+wget https://raw.githubusercontent.com/nallion/FMPLAY-linux/refs/heads/main/radio.c
 gcc -D_DEFAULT_SOURCE -O2 -Wall -Wextra radio.c -o radio -lncursesw
 ```
 or run compile.sh (after installing dependencies)
