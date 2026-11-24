@@ -228,6 +228,7 @@ static int start_player(int index)
             execlp(
                 "mpv",
                 "mpv",
+                "--cache-secs=10",
                 "--no-terminal",
                 "-ao", "alsa",
                 timeout_arg,
