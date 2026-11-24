@@ -6,6 +6,7 @@ Plays stations with 24kbps/s aac-he-v2 bitrate.
 ## Screenshot
 
 ![Radio Player](https://github.com/nallion/FMPLAY-linux/blob/main/Screenshot%202026-11-24%2011.01.28.png)
+![Radio Player](https://github.com/nallion/FMPLAY-linux/blob/main/photo_2026-11-24_22-48-05.jpg)
 
 ## Requirements
 
