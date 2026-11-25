@@ -15,17 +15,13 @@ Plays stations with 24kbps/s aac-he-v2 bitrate.
 - mpv
 - ALSA
 
-## Compilation (Debian / Ubuntu)
+## Compilation & Running (Debian / Ubuntu)
 
 ```bash
+sudo apt-get update
 sudo apt install wget build-essential libncurses-dev mpv
 wget https://raw.githubusercontent.com/nallion/FMPLAY-linux/refs/heads/main/radio.c
 gcc -D_DEFAULT_SOURCE -O2 -Wall -Wextra radio.c -o radio -lncursesw
-```
-or run compile.sh (after installing dependencies and download source)
-
-## RUNNING
-```bash
 ./radio
 ```
 
