@@ -25,8 +25,8 @@
 "Chrome/131.0.0.0 Safari/537.36"
 
 #define RECONNECT_DELAY 1
-#define NETWORK_TIMEOUT 5
-#define STALL_TIMEOUT 5
+#define NETWORK_TIMEOUT 7
+#define STALL_TIMEOUT 7
 #define IPC_INTERVAL 1
 
 #define MIN_WIDTH 72
@@ -216,7 +216,7 @@ static int start_player(int index)
             close(fd);
         }
 
-        char timeout_arg[] = "--network-timeout=5";
+        char timeout_arg[] = "--network-timeout=7";
         char volume_arg[32];
 
         snprintf(volume_arg, sizeof(volume_arg), "--volume=%d", volume);
