@@ -29,6 +29,7 @@ gcc -D_DEFAULT_SOURCE -O2 -Wall -Wextra radio.c -o radio -lncursesw
 ## Downloading & Running builded binary (Debian / Ubuntu)
 
 ```bash
+sudo apt-get update
 sudo apt install wget libncursesw6 mpv
 wget "https://github.com/nallion/FMPLAY-linux/releases/download/Latest-1/radio"
 chmod 777 radio
