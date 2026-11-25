@@ -26,7 +26,7 @@ gcc -D_DEFAULT_SOURCE -O2 -Wall -Wextra radio.c -o radio -lncursesw
 ./radio
 ```
 
-## Downloading & Running binary (Debian / Ubuntu)
+## Downloading & Running builded binary (Debian / Ubuntu)
 
 ```bash
 sudo apt install wget libncursesw6 mpv
