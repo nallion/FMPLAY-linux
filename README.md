@@ -1,6 +1,6 @@
 ## Russian Internet Radio Player (fmplay.ru)
 
-A lightweight console internet radio player written in C using ncurses and mpv.
+A lightweight very stable and reliable console internet radio player written in C using ncurses and mpv.
 Plays stations with 24kbps/s aac-he-v2 bitrate.
 
 ## Screenshots
